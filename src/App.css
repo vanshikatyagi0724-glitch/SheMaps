@@ -2596,3 +2596,154 @@ h3,
   position: relative;
   top: 4px;
 }
+
+
+.map-severity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #51465f;
+}
+
+.map-severity-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.severity-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.severity-dot.high {
+  background: #DC3545;
+}
+
+.severity-dot.medium {
+  background: #F59E0B;
+}
+
+.severity-dot.low {
+  background: #198754;
+}
+
+/* SheMaps map filter controls */
+.map-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #faf7fc;
+  border: 1px solid #eadff1;
+  border-radius: 14px;
+}
+
+.map-filters label {
+  display: flex;
+  flex: 1 1 150px;
+  flex-direction: column;
+  gap: 7px;
+  color: #49345e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.map-filters select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d9c9e5;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #382547;
+  font: inherit;
+  cursor: pointer;
+}
+
+.map-filters select:focus {
+  outline: 2px solid #a56ac5;
+  outline-offset: 2px;
+  border-color: #754399;
+}
+
+.map-filters button {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid #754399;
+  border-radius: 9px;
+  background: #754399;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.map-filters button:hover {
+  background: #5d327b;
+}
+
+.map-filters button:focus-visible {
+  outline: 2px solid #a56ac5;
+  outline-offset: 3px;
+}
+
+.map-severity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #51465f;
+}
+
+.map-severity-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.severity-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.severity-dot.high {
+  background: #DC3545;
+}
+
+.severity-dot.medium {
+  background: #F59E0B;
+}
+
+.severity-dot.low {
+  background: #198754;
+}
+
+@media (max-width: 600px) {
+  .map-filters {
+    align-items: stretch;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .map-filters label {
+    flex-basis: 100%;
+  }
+
+  .map-filters button {
+    width: 100%;
+  }
+}
