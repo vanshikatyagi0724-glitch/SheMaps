@@ -1,9 +1,7 @@
+
 import { useEffect, useState } from "react";
-
 import LocationPicker from "./components/LocationPicker";
-
 import IssueMap from "./components/IssueMap";
-
 import "./App.css";
 
 const initialIssues = [
@@ -56,9 +54,7 @@ function App() {
 
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (error) {
       console.error("Could not load saved reports:", error);
@@ -67,11 +63,22 @@ function App() {
     return initialIssues;
   });
 
+  const [supportedIssueIds, setSupportedIssueIds] = useState(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("shemaps-supported-issues") || "[]"
+      );
+
+      return Array.isArray(saved) ? saved.map(String) : [];
+    } catch (error) {
+      console.error("Could not load supported reports:", error);
+      return [];
+    }
+  });
+
   const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
-  
-const [selectedCoordinates, setSelectedCoordinates] = useState(null);
-
+  const [selectedCoordinates, setSelectedCoordinates] = useState(null);
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -103,11 +110,50 @@ const [selectedCoordinates, setSelectedCoordinates] = useState(null);
   function updateStatus(id, newStatus) {
     setIssues((currentIssues) =>
       currentIssues.map((issue) =>
-        issue.id === id ? { ...issue, status: newStatus } : issue
+        String(issue.id) === String(id)
+          ? { ...issue, status: newStatus }
+          : issue
       )
     );
 
     setNotice("Issue status updated successfully.");
+  }
+
+  // Community support: one support per issue in this browser.
+  function supportIssue(issueId) {
+    const id = String(issueId);
+
+    if (supportedIssueIds.includes(id)) {
+      return;
+    }
+
+    const updatedSupportedIds = [...supportedIssueIds, id];
+
+    // Update the community report count.
+    setIssues((previousIssues) =>
+      previousIssues.map((issue) =>
+        String(issue.id) === id
+          ? {
+              ...issue,
+              reports: (Number(issue.reports) || 0) + 1,
+            }
+          : issue
+      )
+    );
+
+    // Remember which issues this browser has supported.
+    setSupportedIssueIds(updatedSupportedIds);
+
+    try {
+      localStorage.setItem(
+        "shemaps-supported-issues",
+        JSON.stringify(updatedSupportedIds)
+      );
+    } catch (error) {
+      console.error("Could not save support:", error);
+    }
+
+    setNotice("Thanks! Your support has been recorded.");
   }
 
   function addIssue(event) {
@@ -135,20 +181,18 @@ const [selectedCoordinates, setSelectedCoordinates] = useState(null);
       Other: "📍",
     };
 
-    
-const newIssue = {
-  id: Date.now(),
-  category: category,
-  title: title,
-  location: location,
-  latitude: selectedCoordinates?.lat ?? null,
-  longitude: selectedCoordinates?.lng ?? null,
-  severity: severity,
-  status: "Pending",
-  reports: 1,
-  icon: categoryIcons[category] || "📍",
-};
-
+    const newIssue = {
+      id: Date.now(),
+      category,
+      title,
+      location,
+      latitude: selectedCoordinates?.lat ?? null,
+      longitude: selectedCoordinates?.lng ?? null,
+      severity,
+      status: "Pending",
+      reports: 1,
+      icon: categoryIcons[category] || "📍",
+    };
 
     setIssues((currentIssues) => [newIssue, ...currentIssues]);
     setFilter("All");
@@ -191,17 +235,15 @@ const newIssue = {
           <span>◎</span> Community Reports
         </button>
 
-        
-<button
-  className="nav-item"
-  onClick={() => {
-    setSelectedCoordinates(null);
-    setShowForm(true);
-  }}
->
-  <span>＋</span> Report an Issue
-</button>
-
+        <button
+          className="nav-item"
+          onClick={() => {
+            setSelectedCoordinates(null);
+            setShowForm(true);
+          }}
+        >
+          <span>＋</span> Report an Issue
+        </button>
 
         <div className="sidebar-bottom">
           <div className="sidebar-note">
@@ -253,7 +295,10 @@ const newIssue = {
 
           <button
             className="primary-button"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setSelectedCoordinates(null);
+              setShowForm(true);
+            }}
           >
             <span>＋</span> Report an Issue
           </button>
@@ -347,69 +392,89 @@ const newIssue = {
                   <p>Try another filter or report a new issue.</p>
                   <button
                     className="text-button"
-                    onClick={() => setShowForm(true)}
+                    onClick={() => {
+                      setSelectedCoordinates(null);
+                      setShowForm(true);
+                    }}
                   >
                     + Report an issue
                   </button>
                 </div>
               ) : (
-                filteredIssues.map((issue) => (
-                  <article className="issue-card" key={issue.id}>
-                    <div className="issue-icon">{issue.icon}</div>
+                filteredIssues.map((issue) => {
+                  const hasSupported = supportedIssueIds.includes(
+                    String(issue.id)
+                  );
 
-                    <div className="issue-main">
-                      <div className="issue-category">
-                        {issue.category}
+                  return (
+                    <article className="issue-card" key={issue.id}>
+                      <div className="issue-icon">{issue.icon}</div>
+
+                      <div className="issue-main">
+                        <div className="issue-category">
+                          {issue.category}
+                        </div>
+
+                        <h3>{issue.title}</h3>
+
+                        <p className="issue-location">
+                          <span>⌖</span> {issue.location}
+                        </p>
+
+                        <div className="issue-meta">
+                          <span
+                            className={
+                              "severity " +
+                              String(issue.severity).toLowerCase()
+                            }
+                          >
+                            {issue.severity} priority
+                          </span>
+
+                          <span className="reporters">
+                            {issue.reports} community reports
+                          </span>
+                        </div>
                       </div>
 
-                      <h3>{issue.title}</h3>
-
-                      <p className="issue-location">
-                        <span>⌖</span> {issue.location}
-                      </p>
-
-                      <div className="issue-meta">
+                      <div className="issue-actions">
                         <span
                           className={
-                            "severity " +
-                            String(issue.severity).toLowerCase()
+                            "status-badge " +
+                            String(issue.status)
+                              .toLowerCase()
+                              .replace(" ", "-")
                           }
                         >
-                          {issue.severity} priority
+                          {issue.status}
                         </span>
 
-                        <span className="reporters">
-                          {issue.reports} community reports
-                        </span>
+                        <select
+                          aria-label={"Update status for " + issue.title}
+                          value={issue.status}
+                          onChange={(event) =>
+                            updateStatus(issue.id, event.target.value)
+                          }
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Resolved">Resolved</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          className="support-button"
+                          onClick={() => supportIssue(issue.id)}
+                          disabled={hasSupported}
+                        >
+                          {hasSupported
+                            ? "✓ Supported"
+                            : "♡ I face this too"}
+                        </button>
                       </div>
-                    </div>
-
-                    <div className="issue-actions">
-                      <span
-                        className={
-                          "status-badge " +
-                          String(issue.status)
-                            .toLowerCase()
-                            .replace(" ", "-")
-                        }
-                      >
-                        {issue.status}
-                      </span>
-
-                      <select
-                        aria-label={"Update status for " + issue.title}
-                        value={issue.status}
-                        onChange={(event) =>
-                          updateStatus(issue.id, event.target.value)
-                        }
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Resolved">Resolved</option>
-                      </select>
-                    </div>
-                  </article>
-                ))
+                    </article>
+                  );
+                })
               )}
             </div>
 
@@ -428,12 +493,12 @@ const newIssue = {
                 <span className="map-pin-icon">⌖</span>
               </div>
 
-<IssueMap issues={issues} />
+              <IssueMap issues={issues} />
 
-<p className="map-disclaimer">
-  Markers show reported issue locations selected on the map.
-  Map data © OpenStreetMap contributors.
-</p>
+              <p className="map-disclaimer">
+                Markers show reported issue locations selected on the map.
+                Map data © OpenStreetMap contributors.
+              </p>
 
               <div className="map-legend">
                 <span>
@@ -569,28 +634,29 @@ const newIssue = {
                 required
               />
 
-              
               <div className="map-form-section">
-              <label>Pin the exact issue location</label>
-             <p className="location-map-description">
-             Click the map to mark where the infrastructure issue is located.
-             </p>
+                <label>Pin the exact issue location</label>
+                <p className="location-map-description">
+                  Click the map to mark where the infrastructure issue is
+                  located.
+                </p>
 
-             
-<LocationPicker
-  onLocationSelect={(coords) => {
-    setSelectedCoordinates(coords);
+                <LocationPicker
+                  onLocationSelect={(coords) => {
+                    setSelectedCoordinates(coords);
 
-    if (coords.address) {
-      const locationInput = document.getElementById("location");
+                    if (coords.address) {
+                      const locationInput =
+                        document.getElementById("location");
 
-      if (locationInput) {
-        locationInput.value = coords.address;
-      }
-    }
-  }}
-/>
-</div>
+                      if (locationInput) {
+                        locationInput.value = coords.address;
+                      }
+                    }
+                  }}
+                />
+              </div>
+
               <label htmlFor="severity">Severity</label>
               <select
                 id="severity"
@@ -623,5 +689,3 @@ const newIssue = {
 }
 
 export default App;
-
-
