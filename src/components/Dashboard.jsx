@@ -293,6 +293,9 @@ export default function Dashboard() {
                   <div className="hotspot-info">
                     <div className="hotspot-rank">#{idx + 1}</div>
                     <div>
+                      <div className="hotspot-title">
+                        {hs.label || `${Number(hs.latitude).toFixed(3)}° N, ${Number(hs.longitude).toFixed(3)}° E`}
+                      </div>
                       <div className="hotspot-coords">
                         {Number(hs.latitude).toFixed(3)}° N, {Number(hs.longitude).toFixed(3)}° E
                       </div>
@@ -338,7 +341,7 @@ export default function Dashboard() {
               >
                 <Popup>
                   <div>
-                    <strong>Hotspot Cluster #{idx + 1}</strong>
+                    <strong>{hs.label || `Hotspot Cluster #${idx + 1}`}</strong>
                     <p style={{ margin: "4px 0" }}>
                       <strong>{hs.count}</strong> unresolved {hs.count === 1 ? "issue" : "issues"}
                     </p>

@@ -38,7 +38,7 @@ async function runVerification() {
     const listData = await listRes.json();
     assert(listRes.status === 200, "GET /issues returns 200 OK");
     assert(Array.isArray(listData), "Response is an array of issues");
-    assert(listData.length >= 4, "Initial seed data contains at least 4 issues");
+    assert(listData.length >= 12, "Initial seed data contains at least 12 issues");
     assert(typeof listData[0].supported === "boolean", "Each issue has boolean 'supported' flag");
     assert(listData[0].supportCount !== undefined, "Field mapping uses camelCase 'supportCount'");
     assert(listData[0].latitude !== null && listData[0].longitude !== null, "Seed issues have valid latitude/longitude for map display");
@@ -250,14 +250,22 @@ async function runVerification() {
     }
     assert(isSortedDescending, "Ranked list is sorted by priorityScore descending");
 
-    // 16. Hotspots ignore issues with null coordinates
-    console.log(`\n[Check 16] Hotspots ignore issues without coordinates`);
+    // 16. Hotspots ignore issues with null coordinates, contain labels, and have clusters with count 3
+    console.log(`\n[Check 16] Hotspots ignore issues without coordinates, contain labels and count >= 3`);
     assert(Array.isArray(dashboard.hotspots), "Dashboard has hotspots array");
     const allHotspotsHaveCoords = dashboard.hotspots.every(
       (h) => typeof h.latitude === "number" && typeof h.longitude === "number" && typeof h.count === "number"
     );
     assert(allHotspotsHaveCoords, "Hotspots array only groups issues with valid coordinates");
     assert(dashboard.hotspots.length <= 5, "Hotspots contains at most top 5 areas");
+
+    const allHotspotsHaveLabel = dashboard.hotspots.every(
+      (h) => typeof h.label === "string" && h.label.trim().length > 0
+    );
+    assert(allHotspotsHaveLabel, "Each hotspot response contains a non-empty area label");
+
+    const hasClusterOfThree = dashboard.hotspots.some((h) => h.count >= 3);
+    assert(hasClusterOfThree, "At least one hotspot cluster contains a count of 3 unresolved issues");
 
   } catch (error) {
     console.error("\n❌ Fatal error during verification run:", error.message);

@@ -202,7 +202,7 @@ function App() {
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
         >
-          <span>▦</span> Dashboard
+          <span>▦</span> Overview
         </button>
 
         <button
@@ -260,7 +260,7 @@ function App() {
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumb">
-            Workspace <span>/</span> <strong>{activeView === "city_dashboard" ? "City Dashboard" : "Dashboard"}</strong>
+            Workspace <span>/</span> <strong>{activeView === "city_dashboard" ? "City Dashboard" : "Overview"}</strong>
           </div>
 
           <div className="topbar-right">

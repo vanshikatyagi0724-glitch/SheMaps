@@ -297,7 +297,7 @@ export const issueDao = {
 
     // 4. Hotspots: top 5 areas with most unresolved issues, rounded to 3 decimals, ignore null coords
     const unresolvedWithCoords = db.prepare(`
-      SELECT ROUND(latitude, 3) AS lat, ROUND(longitude, 3) AS lng, category
+      SELECT ROUND(latitude, 3) AS lat, ROUND(longitude, 3) AS lng, category, location
       FROM issues
       WHERE status != 'Resolved' AND latitude IS NOT NULL AND longitude IS NOT NULL
     `).all();
@@ -311,11 +311,17 @@ export const issueDao = {
           longitude: Number(row.lng),
           count: 0,
           categories: {},
+          locations: {},
         };
       }
       clusterMap[key].count++;
       clusterMap[key].categories[row.category] =
         (clusterMap[key].categories[row.category] || 0) + 1;
+      const locText = (row.location || "").trim();
+      if (locText) {
+        clusterMap[key].locations[locText] =
+          (clusterMap[key].locations[locText] || 0) + 1;
+      }
     }
 
     const hotspots = Object.values(clusterMap)
@@ -328,7 +334,21 @@ export const issueDao = {
             topCategory = cat;
           }
         }
+
+        let label = "";
+        let maxLocCount = 0;
+        for (const [loc, cnt] of Object.entries(cluster.locations)) {
+          if (cnt > maxLocCount) {
+            maxLocCount = cnt;
+            label = loc;
+          }
+        }
+        if (!label) {
+          label = `${cluster.latitude.toFixed(3)}° N, ${cluster.longitude.toFixed(3)}° E`;
+        }
+
         return {
+          label,
           latitude: cluster.latitude,
           longitude: cluster.longitude,
           count: cluster.count,

@@ -185,23 +185,31 @@ export async function fetchDashboard() {
   ],
   "hotspots": [
     {
+      "label": "Sector 14 Market, Gurugram",
       "latitude": 28.472,
       "longitude": 77.043,
-      "count": 1,
+      "count": 3,
       "topCategory": "Streetlight"
+    },
+    {
+      "label": "HUDA City Centre Metro, Gurugram",
+      "latitude": 28.459,
+      "longitude": 77.073,
+      "count": 3,
+      "topCategory": "Public Transport"
     }
   ],
   "ranked": [
     {
       "id": 1,
-      "title": "Broken streetlight near bus stop",
+      "title": "Broken streetlight near main market gate",
       "category": "Streetlight",
       "severity": "High",
       "status": "Pending",
-      "location": "Sector 14, Gurugram",
-      "supportCount": 12,
-      "daysPending": 12,
-      "priorityScore": 66,
+      "location": "Sector 14 Market, Gurugram",
+      "supportCount": 14,
+      "daysPending": 2,
+      "priorityScore": 60,
       "isSample": true
     }
   ]

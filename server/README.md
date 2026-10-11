@@ -18,7 +18,7 @@ cd server
 # 2. Install dependencies (express, better-sqlite3, cors, dotenv)
 npm install
 
-# 3. Seed initial sample data into the database (4 Gurugram issues with staggered dates and coordinates)
+# 3. Seed initial sample data into the database (12 Gurugram issues with realistic clusters and coordinates)
 npm run seed
 
 # 4. Start the server in development watch mode (auto-reloads on file save)
@@ -99,23 +99,31 @@ $$\text{priorityScore} = (\text{severityWeight} \times 10) + (\text{supportCount
   ],
   "hotspots": [
     {
+      "label": "Sector 14 Market, Gurugram",
       "latitude": 28.472,
       "longitude": 77.043,
-      "count": 1,
+      "count": 3,
       "topCategory": "Streetlight"
+    },
+    {
+      "label": "HUDA City Centre Metro, Gurugram",
+      "latitude": 28.459,
+      "longitude": 77.073,
+      "count": 3,
+      "topCategory": "Public Transport"
     }
   ],
   "ranked": [
     {
       "id": 1,
-      "title": "Broken streetlight near bus stop",
+      "title": "Broken streetlight near main market gate",
       "category": "Streetlight",
       "severity": "High",
       "status": "Pending",
-      "location": "Sector 14, Gurugram",
-      "supportCount": 12,
-      "daysPending": 12,
-      "priorityScore": 66,
+      "location": "Sector 14 Market, Gurugram",
+      "supportCount": 14,
+      "daysPending": 2,
+      "priorityScore": 60,
       "isSample": true
     }
   ]
