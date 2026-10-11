@@ -1,0 +1,270 @@
+/* SheMaps — Live Location & Nearby Awareness Styles */
+/* Reusing core SheMaps tokens without modifying App.css */
+
+.live-location-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.live-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--plum-dark);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.live-toggle-btn:hover:not(:disabled) {
+  background: #f5f0f8;
+  border-color: var(--plum);
+}
+
+.live-toggle-btn.active {
+  background: var(--plum);
+  color: #ffffff;
+  border-color: var(--plum-dark);
+}
+
+.live-toggle-btn.active:hover {
+  background: var(--plum-dark);
+}
+
+.live-toggle-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.recentre-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--plum-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.recentre-btn:hover {
+  background: #f7f3f9;
+  border-color: var(--plum);
+}
+
+.report-here-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--coral);
+  color: #ffffff;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(233, 120, 130, 0.25);
+}
+
+.report-here-btn:hover {
+  background: #d9636e;
+}
+
+/* Status message banners */
+.location-status-banner {
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.location-status-banner.denied {
+  background: #fff5f5;
+  border: 1px solid #ffd1d1;
+  color: #b52c3e;
+}
+
+.location-status-banner.unavailable {
+  background: #fffbeb;
+  border: 1px solid #fef08a;
+  color: #854d0e;
+}
+
+.location-status-banner.insecure {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+/* Live Blue Dot Marker on Leaflet */
+.live-user-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-pulse-ring {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.35);
+  animation: userPulse 2s infinite ease-out;
+}
+
+.user-dot {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes userPulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.live-location-popup {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.live-location-popup strong {
+  color: #1e40af;
+  display: block;
+}
+
+.live-location-popup p {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+/* Nearby Awareness Banner */
+.nearby-issues-banner {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #fff8f9;
+  border: 1px solid #fedfe3;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(233, 120, 130, 0.08);
+}
+
+.nearby-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #9d2b38;
+  margin-bottom: 8px;
+}
+
+.nearby-pulse-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+  animation: blinkNearby 1.5s infinite ease-in-out;
+}
+
+@keyframes blinkNearby {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.nearby-issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nearby-issue-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #f9e2e5;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.nearby-issue-category {
+  font-weight: 700;
+  color: var(--plum);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nearby-issue-title {
+  flex: 1;
+  color: #292338;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.nearby-issue-severity {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.nearby-issue-severity.high {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.nearby-issue-severity.medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.nearby-issue-severity.low {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.nearby-issue-dist {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}

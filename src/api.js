@@ -153,3 +153,32 @@ export async function updateStatus(id, status) {
 export async function fetchDashboard() {
   return await apiRequest("/dashboard");
 }
+
+/**
+ * Reverse geocode latitude and longitude to a human-readable address using Nominatim OpenStreetMap.
+ */
+export async function reverseGeocode(lat, lng) {
+  try {
+    const params = new URLSearchParams({
+      format: "jsonv2",
+      lat: String(lat),
+      lon: String(lng),
+      zoom: "18",
+      addressdetails: "1",
+    });
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?${params}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Address lookup failed");
+    }
+
+    const data = await response.json();
+    return data.display_name || null;
+  } catch {
+    return null;
+  }
+}
+

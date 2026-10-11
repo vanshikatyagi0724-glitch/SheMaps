@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import LocationPicker from "./components/LocationPicker";
 import IssueMap from "./components/IssueMap";
 import Dashboard from "./components/Dashboard";
-import { fetchIssues, createIssue, supportIssue, updateStatus } from "./api";
+import { fetchIssues, createIssue, supportIssue, updateStatus, reverseGeocode } from "./api";
 import "./App.css";
 import "./Dashboard.css";
 
@@ -179,6 +179,25 @@ function App() {
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleReportHere(liveCoords) {
+    if (!liveCoords || liveCoords.lat === undefined || liveCoords.lng === undefined) return;
+    const coords = {
+      lat: Number(Number(liveCoords.lat).toFixed(6)),
+      lng: Number(Number(liveCoords.lng).toFixed(6)),
+    };
+    setSelectedCoordinates(coords);
+    setShowForm(true);
+
+    const address = await reverseGeocode(coords.lat, coords.lng);
+    if (address) {
+      setSelectedCoordinates({ ...coords, address });
+      const locationInput = document.getElementById("location");
+      if (locationInput) {
+        locationInput.value = address;
+      }
     }
   }
 
@@ -532,7 +551,7 @@ function App() {
                 <span className="map-pin-icon">⌖</span>
               </div>
 
-              <IssueMap issues={issues} />
+              <IssueMap issues={issues} onReportHere={handleReportHere} />
 
               <p className="map-disclaimer">
                 Markers show reported issue locations selected on the map.
@@ -703,6 +722,7 @@ function App() {
                 </p>
 
                 <LocationPicker
+                  initialPosition={selectedCoordinates}
                   onLocationSelect={(coords) => {
                     setSelectedCoordinates(coords);
 

@@ -1,14 +1,14 @@
-
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
   Marker,
+  useMap,
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { reverseGeocode } from "../api";
 
 const markerIcon = new L.Icon({
   iconUrl:
@@ -34,57 +34,50 @@ function MapClickHandler({ onSelect }) {
   return null;
 }
 
-export default function LocationPicker({ onLocationSelect }) {
-  const [position, setPosition] = useState(null);
+function MapCenterController({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position && position.lat && position.lng) {
+      map.setView([position.lat, position.lng], 15);
+    }
+  }, [position, map]);
+
+  return null;
+}
+
+export default function LocationPicker({ initialPosition = null, onLocationSelect }) {
+  const [customPosition, setCustomPosition] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [manualMessage, setManualMessage] = useState("");
+
+  const position = customPosition || initialPosition;
 
   async function selectLocation(coords) {
     if (loading) return;
 
-    setPosition(coords);
+    setCustomPosition(coords);
     setLoading(true);
-    setMessage("Finding the address...");
+    setManualMessage("Finding the address...");
 
     onLocationSelect?.(coords);
 
-    try {
-      const params = new URLSearchParams({
-        format: "jsonv2",
-        lat: String(coords.lat),
-        lon: String(coords.lng),
-        zoom: "18",
-        addressdetails: "1",
-      });
+    const address = await reverseGeocode(coords.lat, coords.lng);
 
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?${params}`
+    if (address) {
+      setCustomPosition({ ...coords, address });
+      onLocationSelect?.({ ...coords, address });
+      setManualMessage("Address found and filled into the form.");
+    } else {
+      setManualMessage(
+        "No address found for this point. Please type the location manually."
       );
-
-      if (!response.ok) {
-        throw new Error("Address lookup failed");
-      }
-
-      const data = await response.json();
-      const address = data.display_name;
-
-      if (address) {
-        setPosition({ ...coords, address });
-        onLocationSelect?.({ ...coords, address });
-        setMessage("Address found and filled into the form.");
-      } else {
-        setMessage(
-          "No address found for this point. Please type the location manually."
-        );
-      }
-    } catch {
-      setMessage(
-        "Couldn't retrieve the address. Please enter the location manually."
-      );
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }
+
+  const message = loading
+    ? "Finding the address..."
+    : manualMessage || (position?.address ? "Address filled from pinned location." : "");
 
   return (
     <div className="location-picker">
@@ -93,8 +86,8 @@ export default function LocationPicker({ onLocationSelect }) {
       </p>
 
       <MapContainer
-        center={[28.4595, 77.0266]}
-        zoom={13}
+        center={position ? [position.lat, position.lng] : [28.4595, 77.0266]}
+        zoom={position ? 15 : 13}
         style={{
           height: "350px",
           width: "100%",
@@ -107,6 +100,7 @@ export default function LocationPicker({ onLocationSelect }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <MapCenterController position={position} />
         <MapClickHandler onSelect={selectLocation} />
 
         {position && (
