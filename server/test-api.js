@@ -1,0 +1,187 @@
+/**
+ * SheMaps Backend - Comprehensive Verification Test Suite
+ * Tests every requirement and edge case.
+ */
+
+const BASE_URL = process.env.API_URL || "http://localhost:5000/api";
+
+let passedCount = 0;
+let failedCount = 0;
+
+function assert(condition, testName, details = "") {
+  if (condition) {
+    console.log(`  ✅ PASS: ${testName}`);
+    passedCount++;
+  } else {
+    console.error(`  ❌ FAIL: ${testName} ${details ? "- " + details : ""}`);
+    failedCount++;
+  }
+}
+
+async function runVerification() {
+  console.log(`\n======================================================`);
+  console.log(`  SheMaps Backend Live Endpoint Verification Suite`);
+  console.log(`  Target Base: ${BASE_URL}`);
+  console.log(`======================================================\n`);
+
+  try {
+    // 1. GET /health
+    console.log(`[Check 1] GET /health`);
+    const healthRes = await fetch(`${BASE_URL}/health`);
+    const healthData = await healthRes.json();
+    assert(healthRes.status === 200, "Health check returns 200 OK");
+    assert(healthData.status === "ok", "Health status payload is { status: 'ok' }");
+
+    // 2. GET /issues with supporterId
+    console.log(`\n[Check 2] GET /issues with supporterId query`);
+    const listRes = await fetch(`${BASE_URL}/issues?supporterId=test_supporter_alpha_01`);
+    const listData = await listRes.json();
+    assert(listRes.status === 200, "GET /issues returns 200 OK");
+    assert(Array.isArray(listData), "Response is an array of issues");
+    assert(listData.length >= 4, "Initial seed data contains at least 4 issues");
+    assert(typeof listData[0].supported === "boolean", "Each issue has boolean 'supported' flag");
+    assert(listData[0].supportCount !== undefined, "Field mapping uses camelCase 'supportCount'");
+    assert(listData[0].latitude !== null && listData[0].longitude !== null, "Seed issues have valid latitude/longitude for map display");
+
+    // 3. GET /issues with invalid filter value -> 400
+    console.log(`\n[Check 3] GET /issues with invalid filter values`);
+    const badFilterRes = await fetch(`${BASE_URL}/issues?status=InvalidStatus123`);
+    const badFilterData = await badFilterRes.json();
+    assert(badFilterRes.status === 400, "Invalid filter parameter returns 400 Bad Request");
+    assert(badFilterData.error !== undefined, "Returns error payload");
+
+    // 4. POST /issues (Valid create) -> 201
+    console.log(`\n[Check 4] POST /issues (Valid Creation)`);
+    const validIssuePayload = {
+      title: "Broken streetlight near Metro Gate 3",
+      description: "Bulb shattered, completely dark path leading to parking.",
+      category: "Streetlight",
+      location: "MG Road Metro, Gurugram",
+      severity: "High",
+      latitude: 28.4795,
+      longitude: 77.0805,
+    };
+
+    const createRes = await fetch(`${BASE_URL}/issues`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validIssuePayload),
+    });
+    const createdIssue = await createRes.json();
+    assert(createRes.status === 201, "POST /issues returns 201 Created");
+    assert(createdIssue.id > 0, "Created issue has valid numeric ID");
+    assert(createdIssue.title === validIssuePayload.title, "Title matches payload");
+    assert(createdIssue.status === "Pending", "Status defaults to 'Pending'");
+    assert(createdIssue.supportCount === 1, "supportCount defaults to 1");
+
+    const createdId = createdIssue.id;
+
+    // 5. POST /issues (Invalid create: missing location & short title) -> 400
+    console.log(`\n[Check 5] POST /issues (Invalid Creation: Field Errors)`);
+    const invalidPayload = {
+      title: "No", // < 3 chars
+      category: "InvalidCategory",
+      location: "", // empty
+      severity: "Urgent", // not in High/Medium/Low
+      latitude: 28.47, // lat without lng (violates both-or-neither)
+    };
+
+    const invalidCreateRes = await fetch(`${BASE_URL}/issues`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(invalidPayload),
+    });
+    const invalidCreateData = await invalidCreateRes.json();
+    assert(invalidCreateRes.status === 400, "Invalid payload returns 400 Bad Request");
+    assert(invalidCreateData.details?.title !== undefined, "Contains field error for 'title'");
+    assert(invalidCreateData.details?.location !== undefined, "Contains field error for 'location'");
+    assert(invalidCreateData.details?.category !== undefined, "Contains field error for 'category'");
+    assert(invalidCreateData.details?.severity !== undefined, "Contains field error for 'severity'");
+    assert(invalidCreateData.details?.coordinates !== undefined, "Contains error for both-or-neither coordinates");
+
+    // 6. POST /issues/:id/support (First time -> 201)
+    console.log(`\n[Check 6] POST /issues/:id/support (First time support)`);
+    const supporterId = "supporter_client_token_99999";
+    const supportRes1 = await fetch(`${BASE_URL}/issues/${createdId}/support`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supporterId }),
+    });
+    const supportData1 = await supportRes1.json();
+    assert(supportRes1.status === 201, "First time support returns 201 Created");
+    assert(supportData1.supportCount === 2, "supportCount incremented from 1 to 2");
+    assert(supportData1.supported === true, "supported flag is true");
+
+    // 7. POST /issues/:id/support (Same supporter twice -> 409)
+    console.log(`\n[Check 7] POST /issues/:id/support (Duplicate support by same supporter)`);
+    const supportRes2 = await fetch(`${BASE_URL}/issues/${createdId}/support`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supporterId }),
+    });
+    const supportData2 = await supportRes2.json();
+    assert(supportRes2.status === 409, "Duplicate support by same supporterId returns 409 Conflict");
+    assert(supportData2.error.includes("already"), "Returns clear duplicate error message");
+
+    // 8. PATCH /issues/:id/status (Valid transition: Pending -> In Progress) -> 200
+    console.log(`\n[Check 8] PATCH /issues/:id/status (Valid Transition: Pending -> In Progress)`);
+    const patchRes1 = await fetch(`${BASE_URL}/issues/${createdId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "In Progress", note: "Assigned to maintenance technician" }),
+    });
+    const patchData1 = await patchRes1.json();
+    assert(patchRes1.status === 200, "Valid status transition returns 200 OK");
+    assert(patchData1.status === "In Progress", "Status updated to 'In Progress'");
+
+    // 9. PATCH /issues/:id/status (Same status -> 409 Conflict)
+    console.log(`\n[Check 9] PATCH /issues/:id/status (Same status -> 409 Conflict)`);
+    const sameStatusRes = await fetch(`${BASE_URL}/issues/${createdId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "In Progress" }),
+    });
+    assert(sameStatusRes.status === 409, "Setting same status returns 409 Conflict");
+
+    // 10. PATCH /issues/:id/status (Invalid transition: In Progress -> Pending) -> 400
+    console.log(`\n[Check 10] PATCH /issues/:id/status (Invalid Transition -> 400 Bad Request)`);
+    const badTransitionRes = await fetch(`${BASE_URL}/issues/${createdId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Pending" }),
+    });
+    assert(badTransitionRes.status === 400, "Disallowed status transition returns 400 Bad Request");
+
+    // 11. Nonexistent ID check -> 404
+    console.log(`\n[Check 11] Nonexistent Issue ID -> 404 Not Found`);
+    const nonExistentRes = await fetch(`${BASE_URL}/issues/999999/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "Resolved" }),
+    });
+    assert(nonExistentRes.status === 404, "Targeting non-existent issue returns 404 Not Found");
+
+    // 12. Malformed JSON Body -> 400 Bad Request
+    console.log(`\n[Check 12] Malformed JSON Body -> 400 Bad Request`);
+    const malformedRes = await fetch(`${BASE_URL}/issues`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{ this is not valid json :;; ",
+    });
+    const malformedData = await malformedRes.json();
+    assert(malformedRes.status === 400, "Malformed JSON syntax returns 400 Bad Request");
+    assert(malformedData.error.includes("Malformed JSON"), "Returns clean JSON error response");
+
+  } catch (error) {
+    console.error("\n❌ Fatal error during verification run:", error.message);
+    failedCount++;
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`  VERIFICATION RESULTS: ${passedCount} Passed, ${failedCount} Failed`);
+  console.log(`======================================================\n`);
+
+  process.exit(failedCount > 0 ? 1 : 0);
+}
+
+runVerification();
