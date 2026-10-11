@@ -77,7 +77,7 @@ export default function LocationPicker({ onLocationSelect }) {
           "No address found for this point. Please type the location manually."
         );
       }
-    } catch (error) {
+    } catch {
       setMessage(
         "Couldn't retrieve the address. Please enter the location manually."
       );

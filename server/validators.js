@@ -103,6 +103,17 @@ export function validateCreateIssue(body) {
     longitude = null;
   }
 
+  let supporterId = body.supporterId;
+  if (supporterId !== undefined && supporterId !== null && supporterId !== "") {
+    if (typeof supporterId !== "string" || supporterId.trim().length < 8 || supporterId.trim().length > 64) {
+      errors.supporterId = "Field 'supporterId' must be between 8 and 64 characters";
+    } else {
+      supporterId = supporterId.trim();
+    }
+  } else {
+    supporterId = null;
+  }
+
   if (Object.keys(errors).length > 0) {
     return { valid: false, errors };
   }
@@ -117,6 +128,7 @@ export function validateCreateIssue(body) {
       severity,
       latitude,
       longitude,
+      supporterId,
     },
   };
 }

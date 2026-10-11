@@ -76,6 +76,31 @@ async function runVerification() {
 
     const createdId = createdIssue.id;
 
+    // 4b. POST /issues with supporterId (Reporter counts as supporter)
+    console.log(`\n[Check 4b] POST /issues with supporterId (Reporter is marked supported)`);
+    const reporterId = "reporter_token_user_777";
+    const reporterIssueRes = await fetch(`${BASE_URL}/issues`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...validIssuePayload,
+        title: "Pothole near community center",
+        category: "Road Damage",
+        supporterId: reporterId,
+      }),
+    });
+    const reporterIssue = await reporterIssueRes.json();
+    assert(reporterIssueRes.status === 201, "POST /issues with supporterId returns 201 Created");
+    assert(reporterIssue.supported === true, "Created issue has supported: true for reporter");
+
+    // Reporter cannot add second support to own report
+    const selfSupportRes = await fetch(`${BASE_URL}/issues/${reporterIssue.id}/support`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supporterId: reporterId }),
+    });
+    assert(selfSupportRes.status === 409, "Reporter cannot add second support to own report (409 Conflict)");
+
     // 5. POST /issues (Invalid create: missing location & short title) -> 400
     console.log(`\n[Check 5] POST /issues (Invalid Creation: Field Errors)`);
     const invalidPayload = {

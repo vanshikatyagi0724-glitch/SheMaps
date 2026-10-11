@@ -107,10 +107,11 @@ async function handleSubmit(event) {
   const payload = {
     title: formData.get("title"),
     category: formData.get("category"),
-    location: formData.get("location"),
+    location: formData.get("location") || "Pinned location",
     severity: formData.get("severity"),
     latitude: selectedCoordinates?.lat ?? null,
     longitude: selectedCoordinates?.lng ?? null,
+    supporterId: getSupporterId(), // Marks reporter as initial supporter
   };
 
   try {

@@ -106,23 +106,37 @@ export const issueDao = {
     return toCamelCaseIssue(row, Boolean(row.is_supported));
   },
 
-  create({ title, description, category, location, severity, latitude, longitude }) {
-    const stmt = db.prepare(`
-      INSERT INTO issues (title, description, category, location, severity, status, latitude, longitude, support_count)
-      VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, 1)
-    `);
+  create({ title, description, category, location, severity, latitude, longitude, supporterId = null }) {
+    const createTx = db.transaction(() => {
+      const stmt = db.prepare(`
+        INSERT INTO issues (title, description, category, location, severity, status, latitude, longitude, support_count)
+        VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, 1)
+      `);
 
-    const result = stmt.run(
-      title,
-      description || null,
-      category,
-      location,
-      severity,
-      latitude,
-      longitude
-    );
+      const result = stmt.run(
+        title,
+        description || null,
+        category,
+        location,
+        severity,
+        latitude,
+        longitude
+      );
 
-    return this.getById(result.lastInsertRowid);
+      const issueId = result.lastInsertRowid;
+
+      if (supporterId) {
+        db.prepare(`
+          INSERT INTO issue_supports (issue_id, supporter_id)
+          VALUES (?, ?)
+        `).run(issueId, supporterId);
+      }
+
+      return issueId;
+    });
+
+    const issueId = createTx();
+    return this.getById(issueId, supporterId);
   },
 
   updateStatus(id, newStatus, note = null) {

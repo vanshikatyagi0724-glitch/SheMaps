@@ -2,93 +2,64 @@
 import { useEffect, useState } from "react";
 import LocationPicker from "./components/LocationPicker";
 import IssueMap from "./components/IssueMap";
+import { fetchIssues, createIssue, supportIssue, updateStatus } from "./api";
 import "./App.css";
 
-const initialIssues = [
-  {
-    id: 1,
-    category: "Streetlight",
-    title: "Broken streetlight near bus stop",
-    location: "Sector 14, Gurugram",
-    severity: "High",
-    status: "Pending",
-    reports: 12,
-    icon: "💡",
-  },
-  {
-    id: 2,
-    category: "Footpath",
-    title: "Damaged footpath near market",
-    location: "Sector 15, Gurugram",
-    severity: "Medium",
-    status: "In Progress",
-    reports: 8,
-    icon: "🚶",
-  },
-  {
-    id: 3,
-    category: "Public Transport",
-    title: "Bus stop needs better lighting",
-    location: "Huda City Centre",
-    severity: "High",
-    status: "Pending",
-    reports: 17,
-    icon: "🚌",
-  },
-  {
-    id: 4,
-    category: "Streetlight",
-    title: "Streetlight repaired",
-    location: "Sector 31, Gurugram",
-    severity: "Low",
-    status: "Resolved",
-    reports: 5,
-    icon: "✨",
-  },
-];
+function getAllowedNextStatuses(currentStatus) {
+  const transitions = {
+    Pending: ["In Progress", "Resolved"],
+    "In Progress": ["Resolved"],
+    Resolved: ["In Progress"],
+  };
+  return [currentStatus, ...(transitions[currentStatus] || [])];
+}
 
 function App() {
-  const [issues, setIssues] = useState(() => {
-    try {
-      const saved = localStorage.getItem("shemaps-issues");
-
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (error) {
-      console.error("Could not load saved reports:", error);
-    }
-
-    return initialIssues;
-  });
-
-  const [supportedIssueIds, setSupportedIssueIds] = useState(() => {
-    try {
-      const saved = JSON.parse(
-        localStorage.getItem("shemaps-supported-issues") || "[]"
-      );
-
-      return Array.isArray(saved) ? saved.map(String) : [];
-    } catch (error) {
-      console.error("Could not load supported reports:", error);
-      return [];
-    }
-  });
-
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [filter, setFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState(null);
   const [notice, setNotice] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleRetry() {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const data = await fetchIssues();
+      setIssues(data);
+    } catch (error) {
+      console.error("Could not load reports:", error);
+      setLoadError("Unable to connect to the SheMaps server. Please check that the backend is running.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    try {
-      localStorage.setItem("shemaps-issues", JSON.stringify(issues));
-    } catch (error) {
-      console.error("Could not save reports:", error);
-      setNotice("Reports could not be saved in this browser.");
-    }
-  }, [issues]);
+    let isMounted = true;
+    fetchIssues()
+      .then((data) => {
+        if (isMounted) {
+          setIssues(data);
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          console.error("Could not load reports:", error);
+          setLoadError("Unable to connect to the SheMaps server. Please check that the backend is running.");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const pendingCount = issues.filter(
     (issue) => issue.status === "Pending"
@@ -107,99 +78,90 @@ function App() {
       ? issues
       : issues.filter((issue) => issue.status === filter);
 
-  function updateStatus(id, newStatus) {
-    setIssues((currentIssues) =>
-      currentIssues.map((issue) =>
-        String(issue.id) === String(id)
-          ? { ...issue, status: newStatus }
-          : issue
-      )
-    );
-
-    setNotice("Issue status updated successfully.");
-  }
-
-  // Community support: one support per issue in this browser.
-  function supportIssue(issueId) {
-    const id = String(issueId);
-
-    if (supportedIssueIds.includes(id)) {
-      return;
-    }
-
-    const updatedSupportedIds = [...supportedIssueIds, id];
-
-    // Update the community report count.
-    setIssues((previousIssues) =>
-      previousIssues.map((issue) =>
-        String(issue.id) === id
-          ? {
-              ...issue,
-              reports: (Number(issue.reports) || 0) + 1,
-            }
-          : issue
-      )
-    );
-
-    // Remember which issues this browser has supported.
-    setSupportedIssueIds(updatedSupportedIds);
+  async function handleUpdateStatus(id, newStatus) {
+    const current = issues.find((issue) => String(issue.id) === String(id));
+    if (!current || current.status === newStatus) return;
 
     try {
-      localStorage.setItem(
-        "shemaps-supported-issues",
-        JSON.stringify(updatedSupportedIds)
+      const updated = await updateStatus(id, newStatus);
+      setIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          String(issue.id) === String(id) ? updated : issue
+        )
       );
+      setNotice("Issue status updated successfully.");
     } catch (error) {
-      console.error("Could not save support:", error);
+      setNotice(error.message || "Failed to update issue status.");
     }
-
-    setNotice("Thanks! Your support has been recorded.");
   }
 
-  function addIssue(event) {
+  async function handleSupport(issueId) {
+    try {
+      const updated = await supportIssue(issueId);
+      setIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          String(issue.id) === String(issueId) ? updated : issue
+        )
+      );
+      setNotice("Thanks! Your support has been recorded.");
+    } catch (error) {
+      if (error.status === 409) {
+        setIssues((currentIssues) =>
+          currentIssues.map((issue) =>
+            String(issue.id) === String(issueId)
+              ? { ...issue, supported: true }
+              : issue
+          )
+        );
+      } else {
+        setNotice(error.message || "Could not record support.");
+      }
+    }
+  }
+
+  async function addIssue(event) {
     event.preventDefault();
+    setFormErrors({});
 
     const form = event.currentTarget;
     const formData = new FormData(form);
 
     const category = formData.get("category");
     const title = String(formData.get("title") || "").trim();
-    const location = String(formData.get("location") || "").trim();
+    let location = String(formData.get("location") || "").trim();
     const severity = formData.get("severity");
 
-    if (!title || !location) {
-      setNotice("Please enter both the issue title and location.");
-      return;
+    if (!location && selectedCoordinates) {
+      location = "Pinned location";
     }
 
-    const categoryIcons = {
-      Streetlight: "💡",
-      Footpath: "🚶",
-      "Public Transport": "🚌",
-      "Road Damage": "🚧",
-      Accessibility: "♿",
-      Other: "📍",
-    };
+    setSubmitting(true);
+    try {
+      const created = await createIssue({
+        category,
+        title,
+        location,
+        severity,
+        latitude: selectedCoordinates?.lat ?? null,
+        longitude: selectedCoordinates?.lng ?? null,
+      });
 
-    const newIssue = {
-      id: Date.now(),
-      category,
-      title,
-      location,
-      latitude: selectedCoordinates?.lat ?? null,
-      longitude: selectedCoordinates?.lng ?? null,
-      severity,
-      status: "Pending",
-      reports: 1,
-      icon: categoryIcons[category] || "📍",
-    };
-
-    setIssues((currentIssues) => [newIssue, ...currentIssues]);
-    setFilter("All");
-    setSelectedCoordinates(null);
-    setShowForm(false);
-    setNotice("Your issue has been reported successfully!");
-    form.reset();
+      setIssues((currentIssues) => [created, ...currentIssues]);
+      setFilter("All");
+      setSelectedCoordinates(null);
+      setFormErrors({});
+      setShowForm(false);
+      setNotice("Your issue has been reported successfully!");
+      form.reset();
+    } catch (error) {
+      if (error.details && typeof error.details === "object") {
+        setFormErrors(error.details);
+      } else {
+        setFormErrors({ general: error.message || "Failed to create report." });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -385,7 +347,22 @@ function App() {
             </div>
 
             <div className="issue-list">
-              {filteredIssues.length === 0 ? (
+              {loading ? (
+                <div className="empty-state">
+                  <div>⏳</div>
+                  <h3>Loading reports...</h3>
+                  <p>Connecting to SheMaps community database.</p>
+                </div>
+              ) : loadError ? (
+                <div className="empty-state">
+                  <div>⚠️</div>
+                  <h3>Server connection error</h3>
+                  <p>{loadError}</p>
+                  <button className="text-button" onClick={handleRetry}>
+                    ↻ Retry
+                  </button>
+                </div>
+              ) : filteredIssues.length === 0 ? (
                 <div className="empty-state">
                   <div>✳</div>
                   <h3>No reports here yet</h3>
@@ -402,9 +379,7 @@ function App() {
                 </div>
               ) : (
                 filteredIssues.map((issue) => {
-                  const hasSupported = supportedIssueIds.includes(
-                    String(issue.id)
-                  );
+                  const hasSupported = Boolean(issue.supported);
 
                   return (
                     <article className="issue-card" key={issue.id}>
@@ -453,18 +428,20 @@ function App() {
                           aria-label={"Update status for " + issue.title}
                           value={issue.status}
                           onChange={(event) =>
-                            updateStatus(issue.id, event.target.value)
+                            handleUpdateStatus(issue.id, event.target.value)
                           }
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Resolved">Resolved</option>
+                          {getAllowedNextStatuses(issue.status).map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
                         </select>
 
                         <button
                           type="button"
                           className="support-button"
-                          onClick={() => supportIssue(issue.id)}
+                          onClick={() => handleSupport(issue.id)}
                           disabled={hasSupported}
                         >
                           {hasSupported
@@ -601,6 +578,12 @@ function App() {
             </div>
 
             <form onSubmit={addIssue}>
+              {formErrors.general && (
+                <div style={{ color: "#dc3545", marginBottom: "10px", fontSize: "13px" }}>
+                  {formErrors.general}
+                </div>
+              )}
+
               <label htmlFor="category">Issue category</label>
               <select
                 id="category"
@@ -615,6 +598,11 @@ function App() {
                 <option>Accessibility</option>
                 <option>Other</option>
               </select>
+              {formErrors.category && (
+                <span style={{ color: "#dc3545", fontSize: "12px", display: "block", marginTop: "2px" }}>
+                  {formErrors.category}
+                </span>
+              )}
 
               <label htmlFor="title">What is the issue?</label>
               <input
@@ -624,6 +612,11 @@ function App() {
                 maxLength={120}
                 required
               />
+              {formErrors.title && (
+                <span style={{ color: "#dc3545", fontSize: "12px", display: "block", marginTop: "2px" }}>
+                  {formErrors.title}
+                </span>
+              )}
 
               <label htmlFor="location">Location</label>
               <input
@@ -631,8 +624,12 @@ function App() {
                 name="location"
                 placeholder="e.g. Sector 14, Gurugram"
                 maxLength={120}
-                required
               />
+              {formErrors.location && (
+                <span style={{ color: "#dc3545", fontSize: "12px", display: "block", marginTop: "2px" }}>
+                  {formErrors.location}
+                </span>
+              )}
 
               <div className="map-form-section">
                 <label>Pin the exact issue location</label>
@@ -655,6 +652,11 @@ function App() {
                     }
                   }}
                 />
+                {formErrors.coordinates && (
+                  <span style={{ color: "#dc3545", fontSize: "12px", display: "block", marginTop: "4px" }}>
+                    {formErrors.coordinates}
+                  </span>
+                )}
               </div>
 
               <label htmlFor="severity">Severity</label>
@@ -668,6 +670,11 @@ function App() {
                 <option>Medium</option>
                 <option>Low</option>
               </select>
+              {formErrors.severity && (
+                <span style={{ color: "#dc3545", fontSize: "12px", display: "block", marginTop: "2px" }}>
+                  {formErrors.severity}
+                </span>
+              )}
 
               <div className="form-note">
                 Please avoid including private or personally identifying
@@ -677,8 +684,9 @@ function App() {
               <button
                 className="primary-button submit-button"
                 type="submit"
+                disabled={submitting}
               >
-                Submit Report <span>→</span>
+                {submitting ? "Submitting..." : "Submit Report"} <span>→</span>
               </button>
             </form>
           </section>

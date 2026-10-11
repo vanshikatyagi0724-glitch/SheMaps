@@ -13,13 +13,17 @@ import { HttpError, errorHandler, notFoundHandler } from "./errors.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+const rawCorsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:5174";
+const corsOrigins = rawCorsOrigin
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const ADMIN_KEY = process.env.ADMIN_KEY ? process.env.ADMIN_KEY.trim() : "";
 
 // CORS configuration
 app.use(
   cors({
-    origin: [CORS_ORIGIN, "http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: corsOrigins,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "x-admin-key"],
     credentials: true,
