@@ -197,6 +197,68 @@ async function runVerification() {
     assert(malformedRes.status === 400, "Malformed JSON syntax returns 400 Bad Request");
     assert(malformedData.error.includes("Malformed JSON"), "Returns clean JSON error response");
 
+    // 13. Priority score formula on a known issue
+    console.log(`\n[Check 13] Priority score formula verification`);
+    const priorityTestRes = await fetch(`${BASE_URL}/issues`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "High priority pedestrian crossing issue",
+        category: "Footpath",
+        location: "Sector 21 Market",
+        severity: "High", // Weight 3 -> 30
+        latitude: 28.4800,
+        longitude: 77.0500,
+      }),
+    });
+    const priorityTestIssue = await priorityTestRes.json();
+    // Formula: 3 * 10 + 1 * 2 + 0 = 32
+    assert(priorityTestIssue.daysPending === 0, "New issue has daysPending = 0");
+    assert(priorityTestIssue.priorityScore === 32, "Priority score formula correctly computed: 3*10 + 1*2 + 0 = 32");
+
+    // 14. GET /api/dashboard shape and totals
+    console.log(`\n[Check 14] GET /api/dashboard payload shape and totals`);
+    const dashboardRes = await fetch(`${BASE_URL}/dashboard`);
+    const dashboard = await dashboardRes.json();
+    assert(dashboardRes.status === 200, "GET /api/dashboard returns 200 OK");
+    assert(typeof dashboard.totals?.total === "number", "Dashboard has totals.total");
+    assert(typeof dashboard.totals?.pending === "number", "Dashboard has totals.pending");
+    assert(typeof dashboard.totals?.inProgress === "number", "Dashboard has totals.inProgress");
+    assert(typeof dashboard.totals?.resolved === "number", "Dashboard has totals.resolved");
+    assert(dashboard.totals.total === dashboard.totals.pending + dashboard.totals.inProgress + dashboard.totals.resolved, "Totals sum equals total count");
+
+    const expectedCategories = ["Streetlight", "Footpath", "Public Transport", "Road Damage", "Accessibility", "Other"];
+    const hasAllCategories = expectedCategories.every((cat) => typeof dashboard.byCategory?.[cat] === "number");
+    assert(hasAllCategories, "Dashboard contains counts for all 6 categories (including zeros)");
+
+    const expectedSeverities = ["High", "Medium", "Low"];
+    const hasAllSeverities = expectedSeverities.every((sev) => typeof dashboard.bySeverity?.[sev] === "number");
+    assert(hasAllSeverities, "Dashboard contains counts for all 3 severities");
+
+    // 15. Ranked list in dashboard excludes Resolved issues and is sorted descending
+    console.log(`\n[Check 15] Dashboard ranked list rules`);
+    assert(Array.isArray(dashboard.ranked), "Dashboard has ranked array");
+    const noResolvedInRanked = dashboard.ranked.every((i) => i.status !== "Resolved");
+    assert(noResolvedInRanked, "Ranked list strictly excludes Resolved issues");
+
+    let isSortedDescending = true;
+    for (let idx = 0; idx < dashboard.ranked.length - 1; idx++) {
+      if (dashboard.ranked[idx].priorityScore < dashboard.ranked[idx + 1].priorityScore) {
+        isSortedDescending = false;
+        break;
+      }
+    }
+    assert(isSortedDescending, "Ranked list is sorted by priorityScore descending");
+
+    // 16. Hotspots ignore issues with null coordinates
+    console.log(`\n[Check 16] Hotspots ignore issues without coordinates`);
+    assert(Array.isArray(dashboard.hotspots), "Dashboard has hotspots array");
+    const allHotspotsHaveCoords = dashboard.hotspots.every(
+      (h) => typeof h.latitude === "number" && typeof h.longitude === "number" && typeof h.count === "number"
+    );
+    assert(allHotspotsHaveCoords, "Hotspots array only groups issues with valid coordinates");
+    assert(dashboard.hotspots.length <= 5, "Hotspots contains at most top 5 areas");
+
   } catch (error) {
     console.error("\n❌ Fatal error during verification run:", error.message);
     failedCount++;

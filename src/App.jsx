@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import LocationPicker from "./components/LocationPicker";
 import IssueMap from "./components/IssueMap";
+import Dashboard from "./components/Dashboard";
 import { fetchIssues, createIssue, supportIssue, updateStatus } from "./api";
 import "./App.css";
+import "./Dashboard.css";
 
 function getAllowedNextStatuses(currentStatus) {
   const transitions = {
@@ -15,10 +17,12 @@ function getAllowedNextStatuses(currentStatus) {
 }
 
 function App() {
+  const [activeView, setActiveView] = useState("community");
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [filter, setFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("Newest");
   const [showForm, setShowForm] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState(null);
   const [notice, setNotice] = useState("");
@@ -77,6 +81,20 @@ function App() {
     filter === "All"
       ? issues
       : issues.filter((issue) => issue.status === filter);
+
+  const sortedAndFilteredIssues = [...filteredIssues].sort((a, b) => {
+    if (sortBy === "Highest priority") {
+      return (b.priorityScore || 0) - (a.priorityScore || 0);
+    }
+    if (sortBy === "Most supported") {
+      return (b.supportCount || 0) - (a.supportCount || 0);
+    }
+    // "Newest"
+    const dateA = new Date(a.createdAt || 0).getTime();
+    const dateB = new Date(b.createdAt || 0).getTime();
+    if (dateB !== dateA) return dateB - dateA;
+    return Number(b.id) - Number(a.id);
+  });
 
   async function handleUpdateStatus(id, newStatus) {
     const current = issues.find((issue) => String(issue.id) === String(id));
@@ -178,21 +196,25 @@ function App() {
         <div className="nav-label">WORKSPACE</div>
 
         <button
-          className="nav-item active"
-          onClick={() =>
-            window.scrollTo({ top: 0, behavior: "smooth" })
-          }
+          className={activeView === "community" ? "nav-item active" : "nav-item"}
+          onClick={() => {
+            setActiveView("community");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
         >
           <span>▦</span> Dashboard
         </button>
 
         <button
           className="nav-item"
-          onClick={() =>
-            document.getElementById("issues")?.scrollIntoView({
-              behavior: "smooth",
-            })
-          }
+          onClick={() => {
+            setActiveView("community");
+            setTimeout(() => {
+              document.getElementById("issues")?.scrollIntoView({
+                behavior: "smooth",
+              });
+            }, 50);
+          }}
         >
           <span>◎</span> Community Reports
         </button>
@@ -200,11 +222,22 @@ function App() {
         <button
           className="nav-item"
           onClick={() => {
+            setActiveView("community");
             setSelectedCoordinates(null);
             setShowForm(true);
           }}
         >
           <span>＋</span> Report an Issue
+        </button>
+
+        <button
+          className={activeView === "city_dashboard" ? "nav-item active" : "nav-item"}
+          onClick={() => {
+            setActiveView("city_dashboard");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        >
+          <span>🏛</span> City Dashboard
         </button>
 
         <div className="sidebar-bottom">
@@ -227,7 +260,7 @@ function App() {
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumb">
-            Workspace <span>/</span> <strong>Dashboard</strong>
+            Workspace <span>/</span> <strong>{activeView === "city_dashboard" ? "City Dashboard" : "Dashboard"}</strong>
           </div>
 
           <div className="topbar-right">
@@ -235,36 +268,6 @@ function App() {
             <div className="avatar">V</div>
           </div>
         </header>
-
-        <section className="welcome-section">
-          <div>
-            <div className="eyebrow">
-              <span className="eyebrow-dot" />
-              COMMUNITY IMPACT DASHBOARD
-            </div>
-
-            <h1>
-              Her city. Her voice.
-              <br />
-              <span>Better streets.</span>
-            </h1>
-
-            <p className="welcome-description">
-              Spot a problem, report it, and help your community
-              prioritize better urban spaces for everyone.
-            </p>
-          </div>
-
-          <button
-            className="primary-button"
-            onClick={() => {
-              setSelectedCoordinates(null);
-              setShowForm(true);
-            }}
-          >
-            <span>＋</span> Report an Issue
-          </button>
-        </section>
 
         {notice && (
           <div className="notice-banner" role="status">
@@ -277,6 +280,40 @@ function App() {
             </button>
           </div>
         )}
+
+        {activeView === "city_dashboard" ? (
+          <Dashboard />
+        ) : (
+          <>
+            <section className="welcome-section">
+              <div>
+                <div className="eyebrow">
+                  <span className="eyebrow-dot" />
+                  COMMUNITY IMPACT DASHBOARD
+                </div>
+
+                <h1>
+                  Her city. Her voice.
+                  <br />
+                  <span>Better streets.</span>
+                </h1>
+
+                <p className="welcome-description">
+                  Spot a problem, report it, and help your community
+                  prioritize better urban spaces for everyone.
+                </p>
+              </div>
+
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setSelectedCoordinates(null);
+                  setShowForm(true);
+                }}
+              >
+                <span>＋</span> Report an Issue
+              </button>
+            </section>
 
         <section className="stats-grid">
           <div className="stat-card">
@@ -328,22 +365,39 @@ function App() {
               </span>
             </div>
 
-            <div className="filter-row">
-              {["All", "Pending", "In Progress", "Resolved"].map(
-                (item) => (
-                  <button
-                    key={item}
-                    className={
-                      filter === item
-                        ? "filter-button selected"
-                        : "filter-button"
-                    }
-                    onClick={() => setFilter(item)}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
+            <div className="list-controls-row">
+              <div className="filter-row" style={{ marginBottom: 0 }}>
+                {["All", "Pending", "In Progress", "Resolved"].map(
+                  (item) => (
+                    <button
+                      key={item}
+                      className={
+                        filter === item
+                          ? "filter-button selected"
+                          : "filter-button"
+                      }
+                      onClick={() => setFilter(item)}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="sort-control">
+                <label htmlFor="sort-select">Sort by:</label>
+                <select
+                  id="sort-select"
+                  aria-label="Sort issues list"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="sort-dropdown"
+                >
+                  <option value="Newest">Newest</option>
+                  <option value="Most supported">Most supported</option>
+                  <option value="Highest priority">Highest priority</option>
+                </select>
+              </div>
             </div>
 
             <div className="issue-list">
@@ -362,7 +416,7 @@ function App() {
                     ↻ Retry
                   </button>
                 </div>
-              ) : filteredIssues.length === 0 ? (
+              ) : sortedAndFilteredIssues.length === 0 ? (
                 <div className="empty-state">
                   <div>✳</div>
                   <h3>No reports here yet</h3>
@@ -378,7 +432,7 @@ function App() {
                   </button>
                 </div>
               ) : (
-                filteredIssues.map((issue) => {
+                sortedAndFilteredIssues.map((issue) => {
                   const hasSupported = Boolean(issue.supported);
 
                   return (
@@ -386,8 +440,16 @@ function App() {
                       <div className="issue-icon">{issue.icon}</div>
 
                       <div className="issue-main">
-                        <div className="issue-category">
-                          {issue.category}
+                        <div className="issue-category-row">
+                          <span className="issue-category">
+                            {issue.category}
+                          </span>
+                          <span className="priority-badge">
+                            Priority {issue.priorityScore ?? 0}
+                          </span>
+                          {issue.isSample && (
+                            <span className="sample-tag">Sample</span>
+                          )}
                         </div>
 
                         <h3>{issue.title}</h3>
@@ -537,6 +599,8 @@ function App() {
             </section>
           </div>
         </section>
+      </>
+    )}
 
         <footer className="page-footer">
           <span>SheMaps © 2026</span>

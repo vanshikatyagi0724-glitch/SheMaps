@@ -1,6 +1,6 @@
 # SheMaps — Frontend Integration Guide
 
-Hey teammate! Here is everything you need to replace `localStorage` with the backend API.
+Hey teammate! Here is everything you need to connect the frontend to the backend API, including the priority score and the City Dashboard.
 
 The base URL is: `http://localhost:5000/api`
 
@@ -11,16 +11,16 @@ The base URL is: `http://localhost:5000/api`
 Add this small helper file or utility function in your frontend codebase:
 
 ```javascript
-// src/api.js (or directly in App.jsx)
+// src/api.js
 
-export const API_BASE = "http://localhost:5000/api";
+export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Generates a random anonymous ID (once) and keeps it in localStorage
 export function getSupporterId() {
-  let id = localStorage.getItem("shemaps_supporter_id");
+  let id = localStorage.getItem("shemaps-supporter-id");
   if (!id) {
-    id = "user_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    localStorage.setItem("shemaps_supporter_id", id);
+    id = "sup_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem("shemaps-supporter-id", id);
   }
   return id;
 }
@@ -50,142 +50,171 @@ export async function apiRequest(endpoint, options = {}) {
 
 ---
 
-## 2. UI Actions $\rightarrow$ API Mapping
+## 2. Priority Score & Formula
 
-### A. Load Dashboard & Issues List (Page Mount & Filter Change)
-**UI Action:** When the dashboard loads or when the user changes a filter button (`Pending`, `In Progress`, `Resolved`).
+Every issue returned by `/api/issues` or `/api/dashboard` includes `priorityScore`, `daysPending`, and `isSample`.
 
-```javascript
-useEffect(() => {
-  async function loadIssues() {
-    const supporterId = getSupporterId();
-    // Pass query params for filtering and supporter identification
-    const query = new URLSearchParams();
-    if (filter !== "All") query.set("status", filter);
-    query.set("supporterId", supporterId);
+### Formula:
+$$\text{priorityScore} = (\text{severityWeight} \times 10) + (\text{supportCount} \times 2) + \text{daysPending}$$
 
-    const issues = await apiRequest(`/issues?${query.toString()}`);
-    setIssues(issues);
-  }
-
-  loadIssues().catch(console.error);
-}, [filter]);
-```
-
-**Returned Object Format:**
-```json
-[
-  {
-    "id": 1,
-    "title": "Broken streetlight near bus stop",
-    "description": "Streetlight not functioning",
-    "category": "Streetlight",
-    "location": "Sector 14, Gurugram",
-    "severity": "High",
-    "status": "Pending",
-    "latitude": 28.4720,
-    "longitude": 77.0425,
-    "supportCount": 12,
-    "supported": false,
-    "createdAt": "2026-10-11 12:00:00",
-    "updatedAt": "2026-10-11 12:00:00"
-  }
-]
-```
-> Notice that `supported` is a boolean: if `true`, you can disable the *"♡ I face this too"* button and show *"✓ Supported"*!
+- **severityWeight:**
+  - `High` = 3 (contributes 30 points)
+  - `Medium` = 2 (contributes 20 points)
+  - `Low` = 1 (contributes 10 points)
+- **supportCount:** Number of community supports (contributes 2 points each).
+- **daysPending:** Whole days elapsed since `createdAt` (minimum 0).
+- **isSample:** `true` if seeded initial data, `false` for user-reported issues.
 
 ---
+
+## 3. UI Actions $\rightarrow$ API Mapping
+
+### A. Load Community Issues List
+**UI Action:** When the community reports view loads, filter changes, or sort changes.
+
+```javascript
+export async function fetchIssues() {
+  const supporterId = getSupporterId();
+  return await apiRequest(`/issues?supporterId=${encodeURIComponent(supporterId)}`);
+}
+```
+
+**Issue Object Format:**
+```json
+{
+  "id": 1,
+  "title": "Broken streetlight near bus stop",
+  "description": "Streetlight not functioning",
+  "category": "Streetlight",
+  "location": "Sector 14, Gurugram",
+  "severity": "High",
+  "status": "Pending",
+  "latitude": 28.4720,
+  "longitude": 77.0425,
+  "supportCount": 12,
+  "supported": false,
+  "isSample": true,
+  "daysPending": 12,
+  "priorityScore": 66,
+  "createdAt": "2026-09-30T01:50:00.000Z",
+  "updatedAt": "2026-09-30T01:50:00.000Z"
+}
+```
 
 ### B. Submit a New Issue (`+ Report an Issue`)
 **UI Action:** Form submission in the report modal.
 
 ```javascript
-async function handleSubmit(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-
-  const payload = {
-    title: formData.get("title"),
-    category: formData.get("category"),
-    location: formData.get("location") || "Pinned location",
-    severity: formData.get("severity"),
-    latitude: selectedCoordinates?.lat ?? null,
-    longitude: selectedCoordinates?.lng ?? null,
-    supporterId: getSupporterId(), // Marks reporter as initial supporter
-  };
-
-  try {
-    const newIssue = await apiRequest("/issues", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    // Prepend to current issues list
-    setIssues((prev) => [newIssue, ...prev]);
-    setShowForm(false);
-  } catch (err) {
-    alert(err.message + (err.details ? ": " + JSON.stringify(err.details) : ""));
-  }
+export async function createIssue(formData) {
+  return await apiRequest("/issues", {
+    method: "POST",
+    body: JSON.stringify({
+      title: formData.title,
+      description: formData.description || null,
+      category: formData.category,
+      location: formData.location || "Pinned location",
+      severity: formData.severity,
+      latitude: formData.latitude ?? null,
+      longitude: formData.longitude ?? null,
+      supporterId: getSupporterId(),
+    }),
+  });
 }
 ```
-
----
 
 ### C. Upvote an Issue (`"♡ I face this too"`)
 **UI Action:** Clicking the support button on an issue card.
 
 ```javascript
-async function handleSupport(issueId) {
-  const supporterId = getSupporterId();
-
-  try {
-    const updatedIssue = await apiRequest(`/issues/${issueId}/support`, {
-      method: "POST",
-      body: JSON.stringify({ supporterId }),
-    });
-
-    // Update state with new support count and supported: true
-    setIssues((prev) =>
-      prev.map((item) => (item.id === issueId ? updatedIssue : item))
-    );
-  } catch (err) {
-    if (err.status === 409) {
-      alert("You have already supported this issue!");
-    } else {
-      console.error(err);
-    }
-  }
+export async function supportIssue(issueId) {
+  return await apiRequest(`/issues/${issueId}/support`, {
+    method: "POST",
+    body: JSON.stringify({ supporterId: getSupporterId() }),
+  });
 }
 ```
-
----
 
 ### D. Update Status Dropdown
 **UI Action:** Selecting a new status from the dropdown (`Pending`, `In Progress`, `Resolved`).
 
 ```javascript
-async function handleStatusChange(issueId, newStatus) {
-  try {
-    const updatedIssue = await apiRequest(`/issues/${issueId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: newStatus }),
-    });
+export async function updateStatus(issueId, newStatus) {
+  return await apiRequest(`/issues/${issueId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: newStatus }),
+  });
+}
+```
 
-    setIssues((prev) =>
-      prev.map((item) => (item.id === issueId ? updatedIssue : item))
-    );
-  } catch (err) {
-    alert(err.message);
-  }
+### E. Load City Dashboard Data
+**UI Action:** Switching to the "City Dashboard" tab or clicking "Refresh Data".
+
+```javascript
+export async function fetchDashboard() {
+  return await apiRequest("/dashboard");
 }
 ```
 
 ---
 
-## 3. Allowed Status Transitions
-Keep in mind that the server enforces real-world civic issue progression rules:
-* `Pending` can transition to `In Progress` or `Resolved`
-* `In Progress` can transition to `Resolved`
-* `Resolved` can transition back to `In Progress` (reopen)
-* Attempting to jump backwards to `Pending` will return `400 Bad Request`.
-* Selecting the same status returns `409 Conflict`.
+## 4. `GET /api/dashboard` Response Structure
+
+**Endpoint:** `GET /api/dashboard`
+
+**Example Response:**
+```json
+{
+  "totals": {
+    "total": 4,
+    "pending": 2,
+    "inProgress": 1,
+    "resolved": 1
+  },
+  "byCategory": [
+    { "category": "Streetlight", "count": 1 },
+    { "category": "Footpath", "count": 1 },
+    { "category": "Public Transport", "count": 1 },
+    { "category": "Road Damage", "count": 1 },
+    { "category": "Accessibility", "count": 0 },
+    { "category": "Other", "count": 0 }
+  ],
+  "bySeverity": [
+    { "severity": "High", "count": 2 },
+    { "severity": "Medium", "count": 1 },
+    { "severity": "Low", "count": 1 }
+  ],
+  "hotspots": [
+    {
+      "latitude": 28.472,
+      "longitude": 77.043,
+      "count": 1,
+      "topCategory": "Streetlight"
+    }
+  ],
+  "ranked": [
+    {
+      "id": 1,
+      "title": "Broken streetlight near bus stop",
+      "category": "Streetlight",
+      "severity": "High",
+      "status": "Pending",
+      "location": "Sector 14, Gurugram",
+      "supportCount": 12,
+      "daysPending": 12,
+      "priorityScore": 66,
+      "isSample": true
+    }
+  ]
+}
+```
+
+---
+
+## 5. Allowed Status Transitions
+
+The server enforces real-world civic progression rules:
+- `Pending` $\rightarrow$ `In Progress` or `Resolved`
+- `In Progress` $\rightarrow$ `Resolved`
+- `Resolved` $\rightarrow$ `In Progress` (reopen)
+- Disallowed transitions return `400 Bad Request`.
+- Selecting the identical status returns `409 Conflict`.

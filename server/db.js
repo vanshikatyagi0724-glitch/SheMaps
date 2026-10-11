@@ -30,11 +30,45 @@ const schemaSql = fs.readFileSync(schemaPath, "utf-8");
 db.exec(schemaSql);
 
 /**
+ * Computes priority score and days pending for an issue.
+ * Formula: priorityScore = (severityWeight * 10) + (supportCount * 2) + daysPending
+ * Weights: High = 3, Medium = 2, Low = 1
+ * daysPending: Whole days elapsed since created_at (minimum 0)
+ */
+export function calculatePriority(severity, supportCount, createdAt) {
+  const severityWeights = { High: 3, Medium: 2, Low: 1 };
+  const weight = severityWeights[severity] || 1;
+  const count = Number(supportCount) || 1;
+
+  let daysPending = 0;
+  if (createdAt) {
+    const createdDate = new Date(
+      createdAt.replace(" ", "T") + (createdAt.includes("Z") ? "" : "Z")
+    );
+    const now = new Date();
+    const diffMs = now.getTime() - createdDate.getTime();
+    if (diffMs > 0) {
+      daysPending = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  const priorityScore = weight * 10 + count * 2 + daysPending;
+  return { priorityScore, daysPending };
+}
+
+/**
  * SINGLE HELPER FUNCTION: Maps database snake_case row to frontend camelCase JSON
  * Easily customize response field names here if needed.
  */
 export function toCamelCaseIssue(row, isSupported = false) {
   if (!row) return null;
+
+  const { priorityScore, daysPending } = calculatePriority(
+    row.severity,
+    row.support_count,
+    row.created_at
+  );
+
   return {
     id: row.id,
     title: row.title,
@@ -47,6 +81,9 @@ export function toCamelCaseIssue(row, isSupported = false) {
     longitude: row.longitude !== null && row.longitude !== undefined ? Number(row.longitude) : null,
     supportCount: Number(row.support_count),
     supported: Boolean(isSupported),
+    isSample: Boolean(row.is_sample),
+    daysPending,
+    priorityScore,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -54,7 +91,7 @@ export function toCamelCaseIssue(row, isSupported = false) {
 
 // DAO (Data Access Object) Layer
 export const issueDao = {
-  getAll({ status, category, severity, supporterId } = {}) {
+  getAll({ status, category, severity, supporterId, sort } = {}) {
     let sql;
     const params = [];
 
@@ -86,7 +123,13 @@ export const issueDao = {
     sql += ` ORDER BY created_at DESC, id DESC`;
 
     const rows = db.prepare(sql).all(...params);
-    return rows.map((row) => toCamelCaseIssue(row, Boolean(row.is_supported)));
+    const mapped = rows.map((row) => toCamelCaseIssue(row, Boolean(row.is_supported)));
+
+    if (sort === "priority") {
+      mapped.sort((a, b) => b.priorityScore - a.priorityScore);
+    }
+
+    return mapped;
   },
 
   getById(id, supporterId = null) {
@@ -109,8 +152,8 @@ export const issueDao = {
   create({ title, description, category, location, severity, latitude, longitude, supporterId = null }) {
     const createTx = db.transaction(() => {
       const stmt = db.prepare(`
-        INSERT INTO issues (title, description, category, location, severity, status, latitude, longitude, support_count)
-        VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, 1)
+        INSERT INTO issues (title, description, category, location, severity, status, latitude, longitude, support_count, is_sample)
+        VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, 1, 0)
       `);
 
       const result = stmt.run(
@@ -199,5 +242,128 @@ export const issueDao = {
     });
 
     return supportTx();
+  },
+
+  getDashboardData() {
+    // 1. Totals
+    const totalRow = db.prepare("SELECT COUNT(*) AS count FROM issues").get();
+    const pendingRow = db.prepare("SELECT COUNT(*) AS count FROM issues WHERE status = 'Pending'").get();
+    const inProgressRow = db.prepare("SELECT COUNT(*) AS count FROM issues WHERE status = 'In Progress'").get();
+    const resolvedRow = db.prepare("SELECT COUNT(*) AS count FROM issues WHERE status = 'Resolved'").get();
+
+    const totals = {
+      total: totalRow ? totalRow.count : 0,
+      pending: pendingRow ? pendingRow.count : 0,
+      inProgress: inProgressRow ? inProgressRow.count : 0,
+      resolved: resolvedRow ? resolvedRow.count : 0,
+    };
+
+    // 2. By Category (all 6 categories, including zeros)
+    const ALL_CATEGORIES = [
+      "Streetlight",
+      "Footpath",
+      "Public Transport",
+      "Road Damage",
+      "Accessibility",
+      "Other",
+    ];
+    const categoryRows = db.prepare(`
+      SELECT category, COUNT(*) as count FROM issues GROUP BY category
+    `).all();
+    const byCategory = {};
+    for (const cat of ALL_CATEGORIES) {
+      byCategory[cat] = 0;
+    }
+    for (const r of categoryRows) {
+      if (byCategory[r.category] !== undefined) {
+        byCategory[r.category] = r.count;
+      }
+    }
+
+    // 3. By Severity (High, Medium, Low, including zeros)
+    const ALL_SEVERITIES = ["High", "Medium", "Low"];
+    const severityRows = db.prepare(`
+      SELECT severity, COUNT(*) as count FROM issues GROUP BY severity
+    `).all();
+    const bySeverity = {};
+    for (const sev of ALL_SEVERITIES) {
+      bySeverity[sev] = 0;
+    }
+    for (const r of severityRows) {
+      if (bySeverity[r.severity] !== undefined) {
+        bySeverity[r.severity] = r.count;
+      }
+    }
+
+    // 4. Hotspots: top 5 areas with most unresolved issues, rounded to 3 decimals, ignore null coords
+    const unresolvedWithCoords = db.prepare(`
+      SELECT ROUND(latitude, 3) AS lat, ROUND(longitude, 3) AS lng, category
+      FROM issues
+      WHERE status != 'Resolved' AND latitude IS NOT NULL AND longitude IS NOT NULL
+    `).all();
+
+    const clusterMap = {};
+    for (const row of unresolvedWithCoords) {
+      const key = `${row.lat},${row.lng}`;
+      if (!clusterMap[key]) {
+        clusterMap[key] = {
+          latitude: Number(row.lat),
+          longitude: Number(row.lng),
+          count: 0,
+          categories: {},
+        };
+      }
+      clusterMap[key].count++;
+      clusterMap[key].categories[row.category] =
+        (clusterMap[key].categories[row.category] || 0) + 1;
+    }
+
+    const hotspots = Object.values(clusterMap)
+      .map((cluster) => {
+        let topCategory = "";
+        let maxCount = 0;
+        for (const [cat, cnt] of Object.entries(cluster.categories)) {
+          if (cnt > maxCount) {
+            maxCount = cnt;
+            topCategory = cat;
+          }
+        }
+        return {
+          latitude: cluster.latitude,
+          longitude: cluster.longitude,
+          count: cluster.count,
+          topCategory,
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // 5. Ranked: top 10 unresolved issues sorted by priorityScore descending
+    const unresolvedRows = db.prepare(`
+      SELECT * FROM issues WHERE status != 'Resolved'
+    `).all();
+
+    const unresolvedIssues = unresolvedRows.map((row) => toCamelCaseIssue(row, false));
+    unresolvedIssues.sort((a, b) => b.priorityScore - a.priorityScore);
+
+    const ranked = unresolvedIssues.slice(0, 10).map((i) => ({
+      id: i.id,
+      title: i.title,
+      category: i.category,
+      severity: i.severity,
+      status: i.status,
+      location: i.location,
+      supportCount: i.supportCount,
+      daysPending: i.daysPending,
+      priorityScore: i.priorityScore,
+    }));
+
+    return {
+      totals,
+      byCategory,
+      bySeverity,
+      hotspots,
+      ranked,
+    };
   },
 };

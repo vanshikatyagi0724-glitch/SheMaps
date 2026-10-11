@@ -19,6 +19,7 @@ export function seedData() {
       latitude: 28.4720,
       longitude: 77.0425,
       support_count: 12,
+      daysAgo: "-2 days",
     },
     {
       title: "Damaged footpath near market",
@@ -30,6 +31,7 @@ export function seedData() {
       latitude: 28.4682,
       longitude: 77.0489,
       support_count: 8,
+      daysAgo: "-5 days",
     },
     {
       title: "Bus stop needs better lighting",
@@ -41,6 +43,7 @@ export function seedData() {
       latitude: 28.4595,
       longitude: 77.0726,
       support_count: 17,
+      daysAgo: "-9 days",
     },
     {
       title: "Streetlight repaired",
@@ -52,12 +55,16 @@ export function seedData() {
       latitude: 28.4528,
       longitude: 77.0543,
       support_count: 5,
+      daysAgo: "-12 days",
     },
   ];
 
   const insert = db.prepare(`
-    INSERT INTO issues (title, description, category, location, severity, status, latitude, longitude, support_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO issues (
+      title, description, category, location, severity, status,
+      latitude, longitude, support_count, is_sample, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now', ?), datetime('now', ?))
   `);
 
   const seedTx = db.transaction(() => {
@@ -71,13 +78,15 @@ export function seedData() {
         item.status,
         item.latitude,
         item.longitude,
-        item.support_count
+        item.support_count,
+        item.daysAgo,
+        item.daysAgo
       );
     }
   });
 
   seedTx();
-  console.log("✅ Successfully seeded 4 geolocated Gurugram issues into the database.");
+  console.log("✅ Successfully seeded 4 geolocated Gurugram issues with realistic staggered dates and isSample=1.");
 }
 
 // Run immediately if executed via 'npm run seed'

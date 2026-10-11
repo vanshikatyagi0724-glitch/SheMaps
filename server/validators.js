@@ -138,7 +138,7 @@ export function validateCreateIssue(body) {
  */
 export function validateIssueFilters(query) {
   const errors = {};
-  const { status, category, severity, supporterId } = query;
+  const { status, category, severity, supporterId, sort } = query;
 
   if (status && status !== "" && !ALLOWED_STATUSES.includes(status)) {
     errors.status = `Invalid status filter. Allowed: ${ALLOWED_STATUSES.join(", ")}`;
@@ -152,6 +152,10 @@ export function validateIssueFilters(query) {
     errors.severity = `Invalid severity filter. Allowed: ${ALLOWED_SEVERITIES.join(", ")}`;
   }
 
+  if (sort && !["newest", "priority", "reports"].includes(sort)) {
+    errors.sort = "Invalid sort option. Allowed: newest, priority, reports";
+  }
+
   if (Object.keys(errors).length > 0) {
     return { valid: false, errors };
   }
@@ -163,6 +167,7 @@ export function validateIssueFilters(query) {
       category: category || null,
       severity: severity || null,
       supporterId: supporterId ? String(supporterId).trim() : null,
+      sort: sort || null,
     },
   };
 }

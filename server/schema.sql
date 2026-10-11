@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS issues (
   latitude REAL,
   longitude REAL,
   support_count INTEGER NOT NULL DEFAULT 1 CHECK (support_count >= 1),
+  is_sample INTEGER NOT NULL DEFAULT 0 CHECK (is_sample IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   CHECK (

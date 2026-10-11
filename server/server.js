@@ -52,6 +52,16 @@ api.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// 1b. GET /api/dashboard
+api.get("/dashboard", (req, res, next) => {
+  try {
+    const data = issueDao.getDashboardData();
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // 2. GET /api/issues
 api.get("/issues", (req, res, next) => {
   try {

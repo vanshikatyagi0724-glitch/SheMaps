@@ -46,6 +46,9 @@ export function mapBackendIssueToFrontend(item) {
     icon: CATEGORY_ICONS[item.category] || "📍",
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    daysPending: Number(item.daysPending ?? 0),
+    priorityScore: Number(item.priorityScore ?? 0),
+    isSample: Boolean(item.isSample),
   };
 }
 
@@ -142,4 +145,11 @@ export async function updateStatus(id, status) {
     body: JSON.stringify({ status }),
   });
   return mapBackendIssueToFrontend(updated);
+}
+
+/**
+ * Fetch city dashboard analytics from the backend API.
+ */
+export async function fetchDashboard() {
+  return await apiRequest("/dashboard");
 }

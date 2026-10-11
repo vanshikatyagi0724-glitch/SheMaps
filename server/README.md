@@ -18,7 +18,7 @@ cd server
 # 2. Install dependencies (express, better-sqlite3, cors, dotenv)
 npm install
 
-# 3. Seed initial sample data into the database (4 Gurugram issues with coordinates)
+# 3. Seed initial sample data into the database (4 Gurugram issues with staggered dates and coordinates)
 npm run seed
 
 # 4. Start the server in development watch mode (auto-reloads on file save)
@@ -43,99 +43,118 @@ Configure your local environment by creating `server/.env` (a template is provid
 
 ---
 
-## 3. API Endpoints Reference
+## 3. Priority Score Formula
+
+The priority score is computed dynamically by the API for every issue:
+
+$$\text{priorityScore} = (\text{severityWeight} \times 10) + (\text{supportCount} \times 2) + \text{daysPending}$$
+
+- **severityWeight:**
+  - `High` = 3 (contributes 30 points)
+  - `Medium` = 2 (contributes 20 points)
+  - `Low` = 1 (contributes 10 points)
+- **supportCount:** Number of community members who supported the issue (contributes 2 points each).
+- **daysPending:** Whole days elapsed since `created_at` (minimum 0).
+- **isSample:** `1` (`true`) for seeded sample issues, `0` (`false`) for community submissions.
+
+---
+
+## 4. API Endpoints Reference
 
 **Base URL:** `http://localhost:5000/api`
 
 | Method | Endpoint | Description | Request Body | Success Code | Error Codes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `GET` | `/health` | Server health check and uptime probe | None | `200` | - |
-| `GET` | `/issues` | List issues (newest first). Optional query filters: `status`, `category`, `severity`, `supporterId` | None | `200` | `400` (invalid filter) |
-| `POST` | `/issues` | Create a new civic hazard report | `{ title, description?, category, location, severity, latitude?, longitude? }` | `201` | `400` (validation error) |
+| `GET` | `/issues` | List issues (newest first). Optional query filters: `status`, `category`, `severity`, `sort=priority`, `supporterId` | None | `200` | `400` (invalid filter) |
+| `POST` | `/issues` | Create a new civic hazard report | `{ title, description?, category, location, severity, latitude?, longitude?, supporterId? }` | `201` | `400` (validation error) |
 | `PATCH` | `/issues/:id/status` | Update issue resolution status (allowed transitions only) | `{ status, note? }` (Requires header `x-admin-key` if `ADMIN_KEY` is configured) | `200` | `400` (invalid transition), `403` (forbidden), `404` (not found), `409` (same status) |
 | `POST` | `/issues/:id/support` | Upvote an issue ("I face this too") | `{ supporterId }` (8 to 64 character string) | `201` | `400` (invalid id/body), `404` (not found), `409` (duplicate support) |
+| `GET` | `/dashboard` | City Prioritization Dashboard statistics, category breakdowns, hotspots, and top 10 ranked unresolved issues | None | `200` | - |
 
-### Status Transition Rules
+---
+
+## 5. `GET /api/dashboard` Response Example
+
+```json
+{
+  "totals": {
+    "total": 4,
+    "pending": 2,
+    "inProgress": 1,
+    "resolved": 1
+  },
+  "byCategory": [
+    { "category": "Streetlight", "count": 1 },
+    { "category": "Footpath", "count": 1 },
+    { "category": "Public Transport", "count": 1 },
+    { "category": "Road Damage", "count": 1 },
+    { "category": "Accessibility", "count": 0 },
+    { "category": "Other", "count": 0 }
+  ],
+  "bySeverity": [
+    { "severity": "High", "count": 2 },
+    { "severity": "Medium", "count": 1 },
+    { "severity": "Low", "count": 1 }
+  ],
+  "hotspots": [
+    {
+      "latitude": 28.472,
+      "longitude": 77.043,
+      "count": 1,
+      "topCategory": "Streetlight"
+    }
+  ],
+  "ranked": [
+    {
+      "id": 1,
+      "title": "Broken streetlight near bus stop",
+      "category": "Streetlight",
+      "severity": "High",
+      "status": "Pending",
+      "location": "Sector 14, Gurugram",
+      "supportCount": 12,
+      "daysPending": 12,
+      "priorityScore": 66,
+      "isSample": true
+    }
+  ]
+}
+```
+
+### Hotspot Cluster Calculation
+Hotspots are calculated by grouping unresolved issues (`status != 'Resolved'`) whose coordinates round to 3 decimal places (~110m accuracy) and sorting by issue count descending (top 5 clusters). Issues with `null` coordinates are excluded.
+
+---
+
+## 6. Status Transition Rules
 - `Pending` ➡️ `In Progress` or `Resolved`
 - `In Progress` ➡️ `Resolved`
 - `Resolved` ➡️ `In Progress` (reopening an issue)
 - Attempting to set the current status ➡️ `409 Conflict`
-- Any disallowed jump (e.g. `In Progress` ➡️ `Pending`) ➡️ `400 Bad Request`
+- Disallowed jumps (e.g. `In Progress` ➡️ `Pending`) ➡️ `400 Bad Request`
 
 ---
 
-## 4. Testing Endpoints (PowerShell & curl Examples)
-
-### 1. Health Check
-```powershell
-Invoke-RestMethod -Uri "http://localhost:5000/api/health" -Method Get
-```
-*Expected Response:*
-```json
-{ "status": "ok" }
-```
-
-### 2. Fetch Issues List (with Supporter Identification)
-```powershell
-Invoke-RestMethod -Uri "http://localhost:5000/api/issues?supporterId=user_random_12345" -Method Get
-```
-*Expected Response:* Array of issues where each item contains `"supported": true/false` for that `supporterId`.
-
-### 3. Create a New Issue (Valid)
-```powershell
-$body = @{
-  title = "Broken streetlight outside bus stop"
-  description = "Dark area near Sector 14 market"
-  category = "Streetlight"
-  location = "Sector 14, Gurugram"
-  severity = "High"
-  latitude = 28.4720
-  longitude = 77.0425
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:5000/api/issues" -Method Post -Body $body -ContentType "application/json"
-```
-*Status Code:* `201 Created`
-
-### 4. Create an Issue with Invalid Data (Verifying 400 Bad Request)
-```powershell
-$invalidBody = @{ title = "No"; location = "" } | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5000/api/issues" -Method Post -Body $invalidBody -ContentType "application/json"
-```
-*Status Code:* `400 Bad Request` with field-level validation errors.
-
-### 5. Community Upvote / Support ("I face this too")
-```powershell
-$supportBody = @{ supporterId = "supporter_client_9999" } | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5000/api/issues/1/support" -Method Post -Body $supportBody -ContentType "application/json"
-```
-- **First Call:** Returns `201 Created` and increments `supportCount`.
-- **Second Call (with the same `supporterId`):** Returns `409 Conflict` with error message `"Issue has already been supported by this supporter"`.
-
-### 6. Update Resolution Status
-```powershell
-$statusBody = @{ status = "In Progress"; note = "Assigned to PWD maintenance team" } | ConvertTo-Json
-Invoke-RestMethod -Uri "http://localhost:5000/api/issues/1/status" -Method Patch -Body $statusBody -ContentType "application/json"
-```
-*Status Code:* `200 OK` (creates an audit record in `issue_status_history`).
-
----
-
-## 5. Automated Verification Test Suite
+## 7. Automated Verification Test Suite
 
 You can execute the entire automated test suite with a single command:
 ```bash
 node test-api.js
 ```
 
-This script automatically verifies:
-- Health check probe
-- Issue listing with query filters and supporter state
-- Invalid query filter handling (`400`)
-- Valid issue creation (`201`)
-- Field-level validation error reporting (`400`)
-- Coordinate rules (both-or-neither rule enforcement)
-- Community upvoting (`201`) and duplicate prevention (`409`)
-- Valid status transitions (`200`), duplicate status attempts (`409`), and illegal jumps (`400`)
-- Missing issue handling (`404`)
-- Malformed JSON payload handling (`400`)
+This script verifies:
+1. Health check probe (`200`)
+2. Issue listing with query filters and supporter state (`200`)
+3. Invalid query filter handling (`400`)
+4. Valid issue creation (`201`)
+5. Field-level validation error reporting (`400`)
+6. Coordinate rules (both-or-neither rule enforcement)
+7. Community upvoting (`201`) and duplicate prevention (`409`)
+8. Valid status transitions (`200`), duplicate status attempts (`409`), and illegal jumps (`400`)
+9. Nonexistent issue handling (`404`)
+10. Malformed JSON payload handling (`400`)
+11. Dynamic `priorityScore` formula calculation
+12. `GET /api/dashboard` schema and metrics totals
+13. Ranked list filtering (unresolved only) and sorting (`priorityScore DESC`)
+14. Hotspots coordinate grouping and null coordinate exclusion

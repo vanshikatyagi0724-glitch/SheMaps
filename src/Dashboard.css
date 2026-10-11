@@ -1,0 +1,418 @@
+/* City Dashboard Styles (Reusing SheMaps tokens without modifying App.css) */
+
+.dashboard-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dashboard-header-row h1 {
+  font-family: 'Manrope', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--plum-dark);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.dashboard-subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--plum-dark);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: #f4eff7;
+  border-color: var(--plum);
+}
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Category breakdown with progress bars */
+.category-bars-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 2px 10px rgba(96, 60, 114, 0.04);
+}
+
+.card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.card-title-row h2 {
+  font-family: 'Manrope', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--plum-dark);
+  margin: 0;
+}
+
+.category-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.category-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.category-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.category-name {
+  font-weight: 600;
+  color: #292338;
+}
+
+.category-stats {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.category-stats strong {
+  color: var(--plum-dark);
+  font-weight: 700;
+}
+
+.bar-track {
+  height: 9px;
+  background: #f1ecf4;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--plum), var(--coral));
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+/* Ranked Priority Table */
+.ranked-table-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 2px 10px rgba(96, 60, 114, 0.04);
+  overflow-x: auto;
+}
+
+.ranked-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.ranked-table th {
+  background: #faf7fc;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ranked-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  color: #292338;
+  vertical-align: middle;
+}
+
+.ranked-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ranked-table tr:hover td {
+  background: #fdfbfe;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f4eff7;
+  color: var(--plum);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.rank-top {
+  background: var(--coral);
+  color: #ffffff;
+}
+
+.table-issue-title {
+  font-weight: 600;
+  color: var(--plum-dark);
+  margin-bottom: 3px;
+}
+
+.table-issue-location {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.table-score-badge {
+  display: inline-block;
+  background: #fbf0f2;
+  color: #b52c3e;
+  border: 1px solid #f6ccd2;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.priority-formula-note {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #f8f6fb;
+  border-left: 3px solid var(--plum);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #554d63;
+  line-height: 1.5;
+}
+
+.priority-formula-note strong {
+  color: var(--plum-dark);
+}
+
+/* Hotspots Section */
+.hotspots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .hotspots-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hotspots-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 2px 10px rgba(96, 60, 114, 0.04);
+}
+
+.hotspots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.hotspot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #faf8fc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: border-color 0.15s ease;
+}
+
+.hotspot-item:hover {
+  border-color: var(--plum);
+}
+
+.hotspot-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hotspot-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--plum);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotspot-coords {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--plum-dark);
+}
+
+.hotspot-category-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.hotspot-count-pill {
+  background: #fbf0f2;
+  color: #b52c3e;
+  border: 1px solid #f6ccd2;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Leaflet Custom Hotspot Markers */
+.hotspot-map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc3545;
+  color: #ffffff;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  animation: pulseMarker 2s infinite ease-in-out;
+}
+
+@keyframes pulseMarker {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* Issue Card Enhancements (Priority badge & Sample tag) */
+.issue-category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #f6eaf8;
+  color: var(--plum);
+  border: 1px solid #ebd4ef;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.sample-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f2f2f5;
+  color: #7b7884;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Sort dropdown & filter container */
+.list-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sort-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--plum-dark);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sort-dropdown:focus {
+  border-color: var(--plum);
+}
